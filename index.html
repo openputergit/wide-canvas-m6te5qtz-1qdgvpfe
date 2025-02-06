@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Resume Builder</title>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .neomorphic {
+            border-radius: 20px;
+            background: #e0e5ec;
+            box-shadow: 8px 8px 15px #a3b1c6, -8px -8px 15px #ffffff;
+        }
+        .neomorphic-inset {
+            border-radius: 20px;
+            background: #e0e5ec;
+            box-shadow: inset 8px 8px 15px #a3b1c6, inset -8px -8px 15px #ffffff;
+        }
+        .neomorphic-button {
+            border-radius: 10px;
+            background: #e0e5ec;
+            box-shadow: 5px 5px 10px #a3b1c6, -5px -5px 10px #ffffff;
+            transition: all 0.2s ease;
+        }
+        .neomorphic-button:active {
+            box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
+        }
+        body {
+            background: #e0e5ec;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="resumeBuilder">
+        <nav class="neomorphic p-4 mb-8">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-700">Smart Resume Builder</h1>
+                <div class="flex gap-4">
+                    <template x-if="!user">
+                        <div>
+                            <button @click="showLoginModal = true" class="neomorphic-button px-4 py-2">Login</button>
+                            <button @click="showRegisterModal = true" class="neomorphic-button px-4 py-2">Register</button>
+                        </div>
+                    </template>
+                    <template x-if="user">
+                        <button @click="logout" class="neomorphic-button px-4 py-2">Logout</button>
+                    </template>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container mx-auto px-4 py-8">
+            <template x-if="!user">
+                <div class="text-center">
+                    <h2 class="text-2xl mb-4">Please login to start building your resume</h2>
+                </div>
+            </template>
+
+            <template x-if="user">
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- Resume Form -->
+                    <div class="neomorphic p-6">
+                        <h2 class="text-xl mb-6 font-bold">Personal Information</h2>
+                        <form @submit.prevent="saveResume" class="space-y-4">
+                            <div>
+                                <label class="block mb-2">Full Name</label>
+                                <input type="text" x-model="formData.name" class="neomorphic-inset w-full p-2" required>
+                            </div>
+                            <div>
+                                <label class="block mb-2">Email</label>
+                                <input type="email" x-model="formData.email" class="neomorphic-inset w-full p-2" required>
+                            </div>
+                            <div>
+                                <label class="block mb-2">Skills (comma separated)</label>
+                                <textarea x-model="formData.skills" class="neomorphic-inset w-full p-2" rows="3" required></textarea>
+                            </div>
+                            <div>
+                                <label class="block mb-2">Experience</label>
+                                <textarea x-model="formData.experience" class="neomorphic-inset w-full p-2" rows="5" required></textarea>
+                            </div>
+                            <div class="flex gap-4">
+                                <button type="submit" class="neomorphic-button px-6 py-2">Save Resume</button>
+                                <button type="button" @click="generateAISuggestions" class="neomorphic-button px-6 py-2">
+                                    <i class="bi bi-magic"></i> AI Suggestions
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Preview & Actions -->
+                    <div class="space-y-6">
+                        <div class="neomorphic p-6">
+                            <h2 class="text-xl mb-4 font-bold">Preview</h2>
+                            <div class="neomorphic-inset p-4">
+                                <h3 class="font-bold" x-text="formData.name"></h3>
+                                <p class="text-gray-600" x-text="formData.email"></p>
+                                <div class="mt-4">
+                                    <h4 class="font-bold">Skills</h4>
+                                    <p x-text="formData.skills"></p>
+                                </div>
+                                <div class="mt-4">
+                                    <h4 class="font-bold">Experience</h4>
+                                    <p x-text="formData.experience"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="neomorphic p-6">
+                            <h2 class="text-xl mb-4 font-bold">Actions</h2>
+                            <div class="grid grid-cols-2 gap-4">
+                                <button @click="generatePDF" class="neomorphic-button p-4 flex flex-col items-center">
+                                    <i class="bi bi-file-pdf text-2xl"></i>
+                                    <span>Generate PDF</span>
+                                </button>
+                                <button @click="generateCoverLetter" class="neomorphic-button p-4 flex flex-col items-center">
+                                    <i class="bi bi-file-text text-2xl"></i>
+                                    <span>Cover Letter</span>
+                                </button>
+                                <button @click="shareResume" class="neomorphic-button p-4 flex flex-col items-center">
+                                    <i class="bi bi-share text-2xl"></i>
+                                    <span>Share</span>
+                                </button>
+                                <button @click="findJobs" class="neomorphic-button p-4 flex flex-col items-center">
+                                    <i class="bi bi-search text-2xl"></i>
+                                    <span>Match Jobs</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Login Modal -->
+            <div x-show="showLoginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div class="neomorphic p-8 max-w-md w-full">
+                    <h2 class="text-xl mb-4">Login</h2>
+                    <form @submit.prevent="login" class="space-y-4">
+                        <input type="email" x-model="loginData.email" placeholder="Email" class="neomorphic-inset w-full p-2" required>
+                        <input type="password" x-model="loginData.password" placeholder="Password" class="neomorphic-inset w-full p-2" required>
+                        <div class="flex justify-end gap-4">
+                            <button type="button" @click="showLoginModal = false" class="neomorphic-button px-4 py-2">Cancel</button>
+                            <button type="submit" class="neomorphic-button px-4 py-2">Login</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Register Modal -->
+            <div x-show="showRegisterModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div class="neomorphic p-8 max-w-md w-full">
+                    <h2 class="text-xl mb-4">Register</h2>
+                    <form @submit.prevent="register" class="space-y-4">
+                        <input type="text" x-model="registerData.name" placeholder="Full Name" class="neomorphic-inset w-full p-2" required>
+                        <input type="email" x-model="registerData.email" placeholder="Email" class="neomorphic-inset w-full p-2" required>
+                        <input type="password" x-model="registerData.password" placeholder="Password" class="neomorphic-inset w-full p-2" required>
+                        <div class="flex justify-end gap-4">
+                            <button type="button" @click="showRegisterModal = false" class="neomorphic-button px-4 py-2">Cancel</button>
+                            <button type="submit" class="neomorphic-button px-4 py-2">Register</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('resumeBuilder', () => ({
+                user: null,
+                showLoginModal: false,
+                showRegisterModal: false,
+                loginData: {
+                    email: '',
+                    password: ''
+                },
+                registerData: {
+                    name: '',
+                    email: '',
+                    password: ''
+                },
+                formData: {
+                    name: '',
+                    email: '',
+                    skills: '',
+                    experience: ''
+                },
+
+                async login() {
+                    try {        
+                        const response = await axios.post('/auth/login', this.loginData);
+                        this.user = response.data;
+                        this.showLoginModal = false;
+                        this.loadUserData();
+                    } catch (error) {
+                        alert('Login failed. Please try again.');
+                    }
+                },
+
+                async register() {
+                    try {
+                        const response = await axios.post('/auth/signup', this.registerData);
+                        this.user = response.data;
+                        this.showRegisterModal = false;
+                    } catch (error) {
+                        alert('Registration failed. Please try again.');
+                    }
+                },
+
+                logout() {
+                    this.user = null;
+                    this.formData = {
+                        name: '',
+                        email: '',
+                        skills: '',
+                        experience: ''
+                    };
+                },
+
+                async loadUserData() {
+                    if (this.user) {
+                        try {
+                            const response = await axios.get(`/resume/${this.user.id}`);
+                            this.formData = response.data;
+                        } catch (error) {
+                            console.error('Error loading resume data:', error);
+                        }
+                    }
+                },
+
+                async saveResume() {
+                    try {
+                        await axios.post('/resume/create', {
+                            ...this.formData,
+                            userId: this.user.id
+                        });
+                        alert('Resume saved successfully!');
+                    } catch (error) {
+                        alert('Error saving resume. Please try again.');
+                    }
+                },
+
+                async generateAISuggestions() {
+                    try {
+                        const genAI = new GoogleGenerativeAI("AIzaSyDLbUgMx72ltq6UwsLQQ8mTs6dOCAWQ3GM");
+                        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+                        
+                        const prompt = `Enhance this resume content:
+                            Skills: ${this.formData.skills}
+                            Experience: ${this.formData.experience}`;
+                        
+                        const result = await model.generateContent(prompt);
+                        const suggestions = result.response.text();
+                        
+                        // Update form with AI suggestions
+                        const enhancedContent = await axios.post('/resume/suggestions', {
+                            content: suggestions
+                        });
+                        
+                        this.formData.skills = enhancedContent.data.skills;
+                        this.formData.experience = enhancedContent.data.experience;
+                    } catch (error) {
+                        alert('Error generating AI suggestions. Please try again.');
+                    }
+                },
+
+                async generatePDF() {
+                    try {
+                        const response = await axios.post('/resume/generate', {
+                            userId: this.user.id
+                        }, { responseType: 'blob' });
+                        
+                        const url = window.URL.createObjectURL(new Blob([response.data]));
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.setAttribute('download', 'resume.pdf');
+                        document.body.appendChild(link);
+                        link.click();
+                    } catch (error) {
+                        alert('Error generating PDF. Please try again.');
+                    }
+                },
+
+                async generateCoverLetter() {
+                    try {
+                        const response = await axios.post('/resume/cover-letter', {
+                            userId: this.user.id
+                        });
+                        alert('Cover letter generated and sent to your email!');
+                    } catch (error) {
+                        alert('Error generating cover letter. Please try again.');
+                    }
+                },
+
+                async shareResume() {
+                    try {
+                        const response = await axios.get(`/resume/share/${this.user.id}`);
+                        const shareLink = response.data.shareLink;
+                        navigator.clipboard.writeText(shareLink);
+                        alert('Share link copied to clipboard!');
+                    } catch (error) {
+                        alert('Error sharing resume. Please try again.');
+                    }
+                },
+
+                async findJobs() {
+                    try {
+                        const response = await axios.post('/resume/match-job', {
+                            userId: this.user.id
+                        });
+                        alert('Job matches found! Check your email for recommendations.');
+                    } catch (error) {
+                        alert('Error finding job matches. Please try again.');
+                    }
+                }
+            }));
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
